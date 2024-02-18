@@ -1,0 +1,236 @@
+#include "LunchTask.h"
+#include "usartBus.h"
+#include "can.h"
+#include "pid.h"
+#include "SysCtrl.h"
+
+#include "FreeRTOS.h"
+#include "task.h"
+#include "FreeRTOSConfig.h"
+
+#define PI 3.1415
+
+extern volatile  RC_Ctl_t RC_Ctl;
+
+//#define Fric
+#define Fric_Speed_Set 2000
+
+extern FricPIDinformation Fric[2];
+extern UpstirPIDinformation Upstir;
+extern DownstirPIDinformation Downstir;
+
+extern CanRx_Shoot_st Shoot_RX;
+
+//static Bullet_Shoot_Mode_e Bullet_Shoot_Mode;
+static int16_t Load_BackRoll;
+static int16_t Load_BackRoll_;
+static int16_t Stuck_Status;
+
+static LoadState_en LoadState;
+
+static Shoot_st Shoot;
+
+
+void FricRun(float PRESpeed ,float Speed)
+{
+ Shoot.Shoot_Set_MotorESC.Fric_C620_3508[0] = Speed *2*PI*30.0f;
+ Shoot.Shoot_Set_MotorESC.Fric_C620_3508[1] = -Speed *2*PI*30.0f;
+ Shoot.Shoot_Set_MotorESC.Downstir_C610_P2006 = -PRESpeed*2*PI*30.0f;	
+ 
+ Shoot.Shoot_Set_MotorESC.Fric_C620_3508[0] = Fric_PID_Calc(Fric, Shoot_RX.FricL_Motor_Speed_RX, Shoot.Shoot_Set_MotorESC.Fric_C620_3508[0] ,0);  
+ Shoot.Shoot_Set_MotorESC.Fric_C620_3508[1] = Fric_PID_Calc(Fric, Shoot_RX.FricR_Motor_Speed_RX, Shoot.Shoot_Set_MotorESC.Fric_C620_3508[1], 1);
+ Shoot.Shoot_Set_MotorESC.Downstir_C610_P2006 = Downstir_PID_Calc(&Downstir, Shoot_RX.DownStir_Motor_Speed_RX, Shoot.Shoot_Set_MotorESC.Downstir_C610_P2006);
+ //Shoot.Shoot_Set_MotorESC.Downstir_C610_P2006 = -4000;	
+ Shoot_Run(Shoot.Shoot_Set_MotorESC.Fric_C620_3508[0], 
+	Shoot.Shoot_Set_MotorESC.Fric_C620_3508[1], 
+	0, 
+	Shoot.Shoot_Set_MotorESC.Downstir_C610_P2006);
+}
+
+void FricStop()
+{
+ //Shoot.Shoot_Set_MotorESC.Fric_C620_3508[0] = Fric_PID_Calc(Fric, Shoot_RX.FricL_Motor_Speed_RX, 0, 0);
+ Shoot.Shoot_Set_MotorESC.Fric_C620_3508[0]  = 0;
+ //Shoot.Shoot_Set_MotorESC.Fric_C620_3508[1] = Fric_PID_Calc(Fric, Shoot_RX.FricR_Motor_Speed_RX, 0, 1);
+ Shoot.Shoot_Set_MotorESC.Fric_C620_3508[1] = 0;	
+ Shoot.Shoot_Set_MotorESC.Downstir_C610_P2006 = Downstir_PID_Calc(&Downstir, Shoot_RX.DownStir_Motor_Speed_RX, 0); 	
+ Shoot_Run(Shoot.Shoot_Set_MotorESC.Fric_C620_3508[0], 
+	Shoot.Shoot_Set_MotorESC.Fric_C620_3508[1], 
+	0, 
+	Shoot.Shoot_Set_MotorESC.Downstir_C610_P2006);   
+}
+
+//beiyong
+void UpstirRun()
+{
+// 	static int16_t AngleStart;
+//	static int16_t AngleNow;
+//	static int16_t AngleDelta;
+//	static int startrun = 0 ;
+//	
+//	
+//	if(startrun == 0){AngleStart = Shoot_RX.UpStir_Motor_Angle_RX;startrun = 1;}
+//	else
+//	AngleNow = Shoot_RX.UpStir_Motor_Angle_RX;
+//	if((AngleNow >= 8130))
+//		AngleDelta = 8191- AngleStart + AngleNow;
+//	AngleDelta = AngleNow -  AngleStart;
+//	
+//	if((AngleDelta >=0) && (AngleDelta <= 60)){
+// Shoot.Shoot_Set_MotorESC.Upstir_C620_3508 = Upstir_PID_Calc(&Upstir, Shoot_RX.UpStir_Motor_Speed_RX, 1200);
+//	
+// Shoot_Run(Shoot.Shoot_Set_MotorESC.Fric_C620_3508[0], Shoot.Shoot_Set_MotorESC.Fric_C620_3508[1], Shoot.Shoot_Set_MotorESC.Upstir_C620_3508, Shoot_Set_MotorESC.Downstir_C610_P2006);
+//	}
+//	else
+//	{
+//	 Shoot.Shoot_Set_MotorESC.Upstir_C620_3508 = Upstir_PID_Calc(&Upstir, Shoot_RX.UpStir_Motor_Speed_RX, 0);
+//	 Shoot_Run(Shoot.Shoot_Set_MotorESC.Fric_C620_3508[0], Shoot.Shoot_Set_MotorESC.Fric_C620_3508[1], Shoot.Shoot_Set_MotorESC.Upstir_C620_3508, Shoot_Set_MotorESC.Downstir_C610_P2006);	
+//	 startrun = 0;
+//}	
+Shoot.Shoot_Set_MotorESC.Upstir_C620_3508 = Upstir_PID_Calc(&Upstir, Shoot_RX.UpStir_Motor_Speed_RX, 300);
+
+Shoot_Run(Shoot.Shoot_Set_MotorESC.Fric_C620_3508[0], 
+Shoot.Shoot_Set_MotorESC.Fric_C620_3508[1], 
+Shoot.Shoot_Set_MotorESC.Upstir_C620_3508, 
+Shoot.Shoot_Set_MotorESC.Downstir_C610_P2006);
+}
+
+void Load_Stop()
+{
+ Shoot.Shoot_Set_MotorESC.Upstir_C620_3508 = Upstir_PID_Calc(&Upstir, Shoot_RX.UpStir_Motor_Speed_RX, 0);
+ Shoot_Run(Shoot.Shoot_Set_MotorESC.Fric_C620_3508[0], Shoot.Shoot_Set_MotorESC.Fric_C620_3508[1], Shoot.Shoot_Set_MotorESC.Upstir_C620_3508, Shoot.Shoot_Set_MotorESC.Downstir_C610_P2006);
+}
+
+void Load_IsStuck()
+{
+ if(Stuck_Status != 1)
+ {
+ Load_BackRoll =  -700;
+ Load_BackRoll_ = Load_BackRoll;
+ }
+ if((Shoot_RX.UpStir_Motor_Speed_RX >= -10 )&&(Shoot_RX.UpStir_Motor_Speed_RX <= 10))
+   {
+	Stuck_Status = 1;
+    if(Stuck_Status == 1)
+	{
+       Load_BackRoll_ += 10;
+	}	
+	Shoot_Run(Shoot.Shoot_Set_MotorESC.Fric_C620_3508[0], 
+	          Shoot.Shoot_Set_MotorESC.Fric_C620_3508[1], 
+	          Load_BackRoll_, 
+	          Shoot.Shoot_Set_MotorESC.Downstir_C610_P2006);
+//    if(Shoot_RX.UpStir_Motor_Speed_RX <= -200)
+//       break;		
+   }
+ else 
+	 
+ {Stuck_Status = 0;
+  LoadState = Stop;}
+   
+}
+
+void Fric_Init()
+{
+ Shoot.Shoot_State.Fric_Switch = OFF;
+ Shoot.Shoot_State.RC_State = Changed;	
+}
+
+///
+void DialPlate()
+{
+	static int State;
+	static int MicroSwitch;
+	MicroSwitch = GPIO_ReadInputDataBit(GPIOI, GPIO_Pin_0);
+	while(MicroSwitch != 0){
+		UpstirRun();
+		Load_IsStuck();
+	}
+	UpstirRun();
+	 Shoot.Shoot_State.Load_Switch = OFF;
+	}
+
+void AngleS()
+{
+	//int16_t AngleCnt;
+	static int16_t AngleStart;
+	static int16_t AngleNow;
+	static int16_t AngleDelta;
+	static float AngleCtrlSpeed;
+	static int16_t CtrlT;
+	
+   if (CtrlT ==  0){
+	AngleStart = Shoot_RX.UpStir_Motor_Angle_RX;
+    CtrlT = 1;
+   }
+   if(AngleDelta >= 60){CtrlT = 0;}
+   
+   if(CtrlT ==1){
+	AngleNow = Shoot_RX.UpStir_Motor_Angle_RX;
+	if((AngleNow >= 8130))
+		AngleDelta = 8191- AngleStart + AngleNow;
+	else AngleDelta = AngleNow - AngleStart;
+	while(((AngleNow - AngleStart)>=55)&&((AngleNow - AngleStart)<=65) && (AngleDelta <= 100))
+	{
+		AngleCtrlSpeed = -(AngleNow -60)/5;
+		 Shoot.Shoot_Set_MotorESC.Downstir_C610_P2006 = Upstir_PID_Calc(&Upstir, Shoot_RX.UpStir_Motor_Speed_RX, AngleCtrlSpeed*1500);	
+	     Shoot_Run(Shoot.Shoot_Set_MotorESC.Fric_C620_3508[0], 
+				   Shoot.Shoot_Set_MotorESC.Fric_C620_3508[1], 
+		Shoot.Shoot_Set_MotorESC.Downstir_C610_P2006, 
+		Shoot.Shoot_Set_MotorESC.Downstir_C610_P2006);	
+	}
+	//Shoot_Set_MotorESC.Downstir_C610_P2006 = 0;
+	//Shoot_Run(Shoot.Shoot_Set_MotorESC.Fric_C620_3508[0], Shoot.Shoot_Set_MotorESC.Fric_C620_3508[1], Shoot_Set_MotorESC.Downstir_C610_P2006, Shoot_Set_MotorESC.Downstir_C610_P2006);
+}
+}	
+
+
+
+static int16_t test = 5064;
+static int16_t pretest = 564;
+
+void FricManage()
+{
+ if(Shoot.Shoot_State.Fric_Switch == ON)	FricRun(0,0);
+ else                           FricStop();
+}
+
+void LUNCH_Task(void *pvParameters)
+{
+    for(;;)
+{                                               //在遥控器模式下				
+if(SWITCH1_UP)
+{
+ Shoot.Shoot_State.RC_State = changing;
+}
+
+if(SWITCH1_MID)
+{
+ if(Shoot.Shoot_State.RC_State == changing)
+ {
+  Shoot.Shoot_State.Fric_Switch = (Shoot.Shoot_State.Fric_Switch == ON)? OFF:ON;
+  Shoot.Shoot_State.RC_State = Changed;    
+ }
+ while(Shoot.Shoot_State.RC_State == Changed)
+ {
+  if(Shoot.Shoot_State.Fric_Switch == ON)    
+  {
+  FricRun(pretest, test); 
+  Load_Stop();
+  }  
+  if(Shoot.Shoot_State.Fric_Switch == OFF)      
+  {
+  Fric_Stop();   
+  Load_Stop();
+  }
+ } 
+}
+if(SWITCH1_DOWN)
+{
+ Shoot.Shoot_State.Load_Switch = ON;
+ UpstirRun();
+}
+//键盘模式下	
+}
+vTaskDelay(10);
+}
+

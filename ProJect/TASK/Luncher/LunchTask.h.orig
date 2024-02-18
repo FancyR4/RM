@@ -1,0 +1,107 @@
+#ifndef _LUNCHTASK_H_
+#define _LUNCHTASK_H_
+#include "main.h"
+
+void LUNCH_Task(void *pvParameters);
+
+void FricLCmd(uint16_t cmd);
+void FricRCmd(uint16_t cmd);
+void FricTask(void);
+void FricRun(float PRESpeed ,float Speed);
+void FricStop(void);
+void UpstirRun(void);
+void FricInit(void);
+void LoadIsStuck(void);
+
+void DialPlate(void);
+
+void Test(void);
+
+#define Bullet_Trig_Pin GPIO_ReadInputDataBit(GPIOF, GPIO_Pin_10)
+#define SWITCH_TRIGGER_ON 0
+#define SWITCH_TRIGGER_OFF 1
+#define LEFT 0
+#define RIGHT 1
+
+
+//电机发送数据
+typedef struct
+{
+    int16_t Fric_C620_3508[2];
+    int16_t Upstir_C620_3508;
+	int16_t Downstir_C610_P2006;
+} Shoot_Set_MotorESC_st;
+
+//遥控器使用
+typedef enum
+{
+    Changed = 0,
+    changing = 1,
+}Fric_Switch_e;
+
+//开关状态
+typedef enum
+{
+    ON = 0,
+    OFF = 1,
+}Switch_e;
+
+//拨弹轮状态
+typedef enum
+{
+	Running = 1,
+	Stop = 2,
+    Stuck = 3,
+}LoadState_en;
+
+//发射机构状态机
+typedef struct
+{
+    Fric_Switch_e RC_State;
+    Switch_e Fric_Switch;
+    Switch_e Load_Switch; 
+}Shoot_State_st;
+
+typedef struct
+{
+	Shoot_Set_MotorESC_st Shoot_Set_MotorESC;
+	Shoot_State_st Shoot_State; 
+} Shoot_st;
+
+#endif
+
+/*
+typedef enum
+{
+
+
+}TriggerSwitchOne_en;
+
+typedef enum
+{
+
+
+}TriggerSwitchTwo_en;
+
+typedef enum
+{
+    DialRunning,
+    DialDone,
+    DialStop,
+    DialStuck,
+}DialMotorState_en;
+
+typedef struct
+{
+    unsigned int Magazine;
+    DialMotorState_en DialMotorState;
+
+}Lunch;
+*/
+
+
+
+
+
+
+
